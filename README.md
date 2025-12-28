@@ -171,7 +171,10 @@ Key areas for contribution:
 
 ## License
 
-[MIT License](LICENSE)
+Copyright 2026 Hasin Raiyan. All Rights Reserved.
+
+**NOT OPEN SOURCE.**
+This code is proprietary and confidential. Modification, distribution, or use of this source code is strictly prohibited. Do not download.
 
 ---
 
