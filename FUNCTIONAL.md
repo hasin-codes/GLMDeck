@@ -19,17 +19,17 @@ To achieve professional results, do not ask a single LLM to "make a presentation
 
 ### Agent L1: The Strategist (Narrative Architect)
 
-- **Model:** `gemini-2.5-flash` (Optimized for speed/context window)
+- **Model:** `GLM-2.5-flash` (Optimized for speed/context window)
 - **Role:** Analyzes the prompt and user history. Outputs a "Master Plan"—a structured list of slide titles and the "Visual Intent" (e.g., "Minimalist Hero with centered bold text").
 
 ### Agent L2: The UI Architect (Frontend Engineer)
 
-- **Model:** `gemini-2.5-pro` (Optimized for code generation)
+- **Model:** `GLM-2.5-pro` (Optimized for code generation)
 - **Role:** Consumes the Plan and the **Existing Project State**. Generates raw, atomic HTML using Tailwind utility classes.
 
 ### Agent L3: The Vision Specialist (Asset Generator)
 
-- **Model:** `gemini-2.5-flash-image` (Optimized for high-speed visuals)
+- **Model:** `GLM-2.5-flash-image` (Optimized for high-speed visuals)
 - **Role:** Extracts "Image Prompts" from the UI Architect's code and generates thematic assets.
 
 ---
@@ -266,7 +266,7 @@ export interface GenerationRequest {
 
 ## 9. Reference Implementation: AI Slide Generation Service
 
-This section provides a **complete pseudo-code reference** for implementing the slide generation service. It is designed to be **LLM-agnostic**—swap `YourLLMProvider` and `YourImageProvider` for any SDK (Gemini, OpenAI, Anthropic, etc.).
+This section provides a **complete pseudo-code reference** for implementing the slide generation service. It is designed to be **LLM-agnostic**—swap `YourLLMProvider` and `YourImageProvider` for any SDK (GLM, OpenAI, Anthropic, etc.).
 
 ### Why Raw HTML + Tailwind?
 
@@ -381,7 +381,7 @@ Explain your plan clearly to the user. Be specific about:
 3. What changes you will make`;
 
   const response = await llmProvider.generateText({
-    model: 'fast-reasoning-model',  // e.g., gemini-2.5-flash, gpt-4o-mini
+    model: 'fast-reasoning-model',  // e.g., GLM-2.5-flash, gpt-4o-mini
     systemPrompt,
     messages: [...formattedHistory, { role: 'user', content: prompt }]
   });
@@ -484,7 +484,7 @@ CRITICAL INSTRUCTIONS:
 OUTPUT: Return the COMPLETE slides array (including unchanged slides).`;
 
   const response = await llmProvider.generateJSON<UIArchitectOutput>({
-    model: 'powerful-code-model',  // e.g., gemini-2.5-pro, gpt-4o, claude-3.5-sonnet
+    model: 'powerful-code-model',  // e.g., GLM-2.5-pro, gpt-4o, claude-3.5-sonnet
     systemPrompt,
     messages: [{
       role: 'user',
@@ -711,7 +711,7 @@ CREATE INDEX idx_project_slides ON "Slide" ("projectId", "order");
 
 ### Priority 1: Core AI Integration
 
-- [ ] Set up `lib/ai/providers/gemini.ts` with Google Gemini SDK
+- [ ] Set up `lib/ai/providers/GLM.ts` with Google GLM SDK
 - [ ] Create `lib/ai/agents/slideGenerator.ts` orchestrator
 - [ ] Wire `/api/generate` route to ChatPanel
 

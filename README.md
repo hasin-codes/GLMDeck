@@ -115,13 +115,13 @@ See **[FUNCTIONAL.md](./FUNCTIONAL.md)** for the complete technical engineering 
 
 | Agent | Role | Recommended Model |
 |-------|------|-------------------|
-| **L1: Strategist** | Narrative planning & intent analysis | `gemini-2.5-flash` / `gpt-4o-mini` |
-| **L2: UI Architect** | Tailwind HTML code generation | `gemini-2.5-pro` / `gpt-4o` |
-| **L3: Vision Specialist** | Image asset generation | `gemini-2.5-flash-image` / `dall-e-3` |
+| **L1: Strategist** | Narrative planning & intent analysis | `GLM-2.5-flash` / `gpt-4o-mini` |
+| **L2: UI Architect** | Tailwind HTML code generation | `GLM-2.5-pro` / `gpt-4o` |
+| **L3: Vision Specialist** | Image asset generation | `GLM-2.5-flash-image` / `dall-e-3` |
 
 ### Supported Providers
 
-- **Google** — Gemini (recommended)
+- **Google** — GLM (recommended)
 - **OpenAI** — GPT-4, DALL-E 3
 - **Anthropic** — Claude
 - **Custom** — Any LLM via provider interface
@@ -133,15 +133,15 @@ See **[FUNCTIONAL.md](./FUNCTIONAL.md)** for the complete technical engineering 
 Create `.env.local`:
 
 ```bash
-# LLM Provider (openai | anthropic | gemini)
-LLM_PROVIDER=gemini
+# LLM Provider (openai | anthropic | GLM)
+LLM_PROVIDER=GLM
 GOOGLE_API_KEY=your-api-key
 
 # Or for OpenAI
 # OPENAI_API_KEY=sk-...
 
 # Image Generation
-IMAGE_PROVIDER=gemini
+IMAGE_PROVIDER=GLM
 IMAGE_ENABLED=true
 ```
 
