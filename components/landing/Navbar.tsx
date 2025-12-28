@@ -1,12 +1,7 @@
 import Link from "next/link";
 import { Sparkles } from "lucide-react";
-import { withAuth, getSignUpUrl } from "@workos-inc/authkit-nextjs";
-import ProfileDropdown from "@/components/kokonutui/profile-dropdown";
 
 export async function Navbar() {
-    const { user } = await withAuth();
-    const signUpUrl = await getSignUpUrl();
-
     return (
         <header className="relative z-50 flex items-center justify-between px-8 py-6 max-w-7xl mx-auto w-full">
             <Link href="/" className="flex items-center gap-2 group cursor-pointer transition-transform active:scale-95">
@@ -20,25 +15,6 @@ export async function Navbar() {
 
             <nav className="flex items-center gap-4">
                 <button className="text-sm font-medium text-muted hover:text-foreground transition-colors">Documentation</button>
-
-                {!user ? (
-                    <>
-                        <a
-                            href="/login"
-                            className="text-sm font-medium text-muted hover:text-foreground transition-colors"
-                        >
-                            Sign in
-                        </a>
-                        <Link
-                            href={signUpUrl}
-                            className="px-4 py-2 rounded-lg bg-brand text-black text-sm font-semibold hover:bg-brand/90 transition-colors"
-                        >
-                            Sign up
-                        </Link>
-                    </>
-                ) : (
-                    <ProfileDropdown user={user} />
-                )}
             </nav>
         </header>
     );

@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Playfair_Display, Outfit } from "next/font/google";
-import { AuthKitProvider } from "@workos-inc/authkit-nextjs/components";
 import "./globals.css";
 
 const playfair = Playfair_Display({
@@ -39,7 +38,7 @@ export default function RootLayout({
       <body
         className={`${playfair.variable} ${outfit.variable} antialiased bg-background text-foreground selection:bg-brand selection:text-black`}
       >
-        <AuthKitProvider>{children}</AuthKitProvider>
+        {children}
       </body>
     </html>
   );
