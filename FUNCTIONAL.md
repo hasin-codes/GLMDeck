@@ -1,192 +1,190 @@
-# GLM Slide Agent - Functional Integration Guide
+# GLM Slide Agent: Technical Engineering Manual
 
-> **Purpose**: Complete technical specification for integrating AI-powered slide generation with any LLM and image model.
-
----
-
-## Table of Contents
-
-1. [Architecture Overview](#architecture-overview)
-2. [Type System](#type-system)
-3. [Core Integration Modules](#core-integration-modules)
-4. [LLM Provider Abstraction](#llm-provider-abstraction)
-5. [Image Generation Pipeline](#image-generation-pipeline)
-6. [Multi-Agent Workflow](#multi-agent-workflow)
-7. [API Routes](#api-routes)
-8. [Frontend Integration](#frontend-integration)
-9. [Error Handling & Resilience](#error-handling--resilience)
-10. [Environment Configuration](#environment-configuration)
+This manual provides an exhaustive blueprint for engineers looking to build a production-grade generative presentation platform using **Next.js**, **Tailwind CSS**, and **Multi-Agent LLM Orchestration**.
 
 ---
 
-## Architecture Overview
+## 1. System Philosophy: The "Canvas vs. Brain" Split
+
+In a modern Generative UI application, you must decouple the **Narrative Logic** (the "Brain") from the **Visual Layout** (the "Canvas").
+
+- **The Brain (Chat):** Handles reasoning, memory, and strategic planning.
+- **The Canvas (Slides):** A high-fidelity execution layer that interprets code and assets.
+
+---
+
+## 2. Multi-Agent Orchestration Pipeline
+
+To achieve professional results, do not ask a single LLM to "make a presentation." Instead, use a specialized pipeline:
+
+### Agent L1: The Strategist (Narrative Architect)
+
+- **Model:** `gemini-2.5-flash` (Optimized for speed/context window)
+- **Role:** Analyzes the prompt and user history. Outputs a "Master Plan"—a structured list of slide titles and the "Visual Intent" (e.g., "Minimalist Hero with centered bold text").
+
+### Agent L2: The UI Architect (Frontend Engineer)
+
+- **Model:** `gemini-2.5-pro` (Optimized for code generation)
+- **Role:** Consumes the Plan and the **Existing Project State**. Generates raw, atomic HTML using Tailwind utility classes.
+
+### Agent L3: The Vision Specialist (Asset Generator)
+
+- **Model:** `gemini-2.5-flash-image` (Optimized for high-speed visuals)
+- **Role:** Extracts "Image Prompts" from the UI Architect's code and generates thematic assets.
+
+---
+
+## 3. Contextual Awareness: The "Edit This" Problem
+
+A major challenge is ensuring the AI knows which slide you want to edit.
+
+1. **Index Tracking:** Pass the `currentSlideIndex` as a metadata field in every API request.
+2. **State Reflection:** The UI Architect agent should be fed the *entire current array of slides* (as a stringified JSON) in its prompt.
+3. **Surgical Edits:** Instruct the agent: *"If updating slide ID 'X', keep the existing layout structure but swap the color palette to Indigo."*
+
+---
+
+## 4. Current Project State
+
+### Directory Structure
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                           GLM SLIDE AGENT SYSTEM                            │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│  ┌───────────────┐     ┌──────────────────┐     ┌───────────────────────┐  │
-│  │   ChatPanel   │────▶│  /api/generate   │────▶│   Agent Orchestrator  │  │
-│  │  (User Input) │     │   (Next.js API)  │     │                       │  │
-│  └───────────────┘     └──────────────────┘     └───────────┬───────────┘  │
-│                                                              │              │
-│                        ┌─────────────────────────────────────┼──────────┐   │
-│                        │           AGENT PIPELINE            │          │   │
-│                        │  ┌──────────────┐  ┌──────────────┐ │          │   │
-│                        │  │  Narrative   │  │     UI       │ │          │   │
-│                        │  │   Planner    │──│  Architect   │ │          │   │
-│                        │  │  (fast LLM)  │  │  (pro LLM)   │ │          │   │
-│                        │  └──────────────┘  └──────┬───────┘ │          │   │
-│                        │                           │         │          │   │
-│                        │                    ┌──────▼───────┐ │          │   │
-│                        │                    │    Image     │ │          │   │
-│                        │                    │  Generator   │ │          │   │
-│                        │                    └──────────────┘ │          │   │
-│                        └────────────────────────────────────────────────┘   │
-│                                                              │              │
-│  ┌───────────────┐     ┌──────────────────┐     ┌───────────▼───────────┐  │
-│  │ SlidePreview  │◀────│   State Manager  │◀────│   Processed Slides    │  │
-│  │ ThumbnailStrip│     │    (Context)     │     │   + Image Assets      │  │
-│  └───────────────┘     └──────────────────┘     └───────────────────────┘  │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
+slides/
+├── app/
+│   ├── page.tsx              # Landing page (HeroSection + CreationCard + QuickStartGrid)
+│   ├── p/[id]/page.tsx       # Workspace (ChatPanel + SlidePreview + ThumbnailStrip)
+│   ├── layout.tsx            # Root layout with Google Fonts + metadata
+│   └── globals.css           # CSS variables + Tailwind v4 theme
+├── components/
+│   ├── landing/
+│   │   ├── HeroSection.tsx   # Animated hero with gradient text
+│   │   ├── CreationCard.tsx  # Glass-morphism prompt input card
+│   │   ├── QuickStartGrid.tsx# Community gallery with Next/Image + fallbacks
+│   │   ├── Navbar.tsx        # Fixed top nav with glass effect
+│   │   └── Footer.tsx        # Minimal footer
+│   ├── workspace/
+│   │   ├── ChatPanel.tsx     # Chat interface for AI interaction
+│   │   ├── SlidePreview.tsx  # Main slide renderer (iframe sandbox)
+│   │   ├── ThumbnailStrip.tsx# Horizontal slide navigation
+│   │   └── TopBar.tsx        # Project title + controls
+│   └── ui-premium.tsx        # PremiumButton, GlassCard components
+├── lib/
+│   └── utils.ts              # cn() classname merger utility
+└── public/
+    └── thumbnails/           # Community template preview images
 ```
 
-### Data Flow
+### Design Tokens (globals.css)
 
-1. **User Input** → ChatPanel captures prompt
-2. **API Route** → Validates and routes to agent orchestrator
-3. **Narrative Planner** → Understands intent (edit/add/restructure)
-4. **UI Architect** → Generates structured slide JSON with Tailwind HTML
-5. **Image Generator** → Replaces `{{IMG_X}}` placeholders with base64
-6. **Frontend** → Renders slides with smooth transitions
+```css
+:root {
+  --background: #000000;
+  --foreground: #ffffff;
+  --brand: #34B27B;
+  --surface: #0A0A0A;
+  --border: #1A1A1A;
+  --muted: #A1A1AA;
+}
+```
+
+### Key Components Implemented
+
+| Component | Status | Description |
+|-----------|--------|-------------|
+| `HeroSection` | ✅ Complete | Animated gradient hero with typewriter effect |
+| `CreationCard` | ✅ Complete | Prompt input with Slide/Poster toggle |
+| `QuickStartGrid` | ✅ Complete | 6 community cards with Next/Image + fallbacks |
+| `ChatPanel` | ✅ Shell | Message list UI (needs LLM integration) |
+| `SlidePreview` | ✅ Complete | 5 demo slides with metrics layout |
+| `ThumbnailStrip` | ✅ Complete | Horizontal scroll + active indicator |
+| `TopBar` | ✅ Complete | Project title + placeholder controls |
 
 ---
 
-## Type System
+## 5. Phase 2: Authentication & Backend (Scaling Up)
 
-Create `lib/types.ts`:
+Transitioning from a "Local Demo" to a "Production SaaS" requires a robust backend architecture.
+
+### A. Authentication (The Gatekeeper)
+
+Use **Clerk** or **Auth.js (NextAuth)**.
+
+- **Client Side:** Use hooks like `useUser()` to identify the operator.
+- **Server Side:** Protect your API routes. Every LLM request must verify the `userId`.
+
+### B. Database Schema (The Memory)
+
+Use an ORM like **Prisma** with a Postgres database (Supabase/Neon).
+
+```prisma
+model User {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  projects  Project[]
+}
+
+model Project {
+  id        String   @id @default(cuid())
+  title     String
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  slides    Slide[]
+  messages  Message[]
+  createdAt DateTime @default(now())
+}
+
+model Slide {
+  id        String  @id @default(uuid())
+  order     Int
+  title     String
+  code      String  @db.Text // Store the generated Tailwind/HTML
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id])
+}
+```
+
+---
+
+## 6. API Route Structure (To Implement)
+
+### `/api/generate` — Main Generation Endpoint
 
 ```typescript
-/**
- * Agent operation modes - determines slide vs poster generation behavior
- */
-export enum AgentMode {
-  SLIDE = 'SLIDE',   // 16:9 presentation slides
-  POSTER = 'POSTER'  // Portrait/square poster format
-}
+// app/api/generate/route.ts
+import { NextRequest, NextResponse } from 'next/server';
 
-/**
- * Individual slide content structure
- * Contains both metadata and renderable HTML
- */
-export interface SlideContent {
-  id: string;
-  title: string;
-  code: string;  // Tailwind-infused HTML for the slide layout
-  imageAssets: Record<string, string>;  // {{IMG_0}} → base64 data mapping
-}
+export async function POST(req: NextRequest) {
+  const { prompt, mode, existingSlides, activeSlideIndex, history } = await req.json();
 
-/**
- * Complete project state
- */
-export interface Project {
-  id: string;
-  title: string;
-  mode: AgentMode;
-  slides: SlideContent[];
-  history: Message[];
-  createdAt: number;
-  updatedAt?: number;
-}
+  // 1. Call L1 Strategist for narrative plan
+  // 2. Call L2 UI Architect for Tailwind HTML
+  // 3. Call L3 Vision Specialist for images
+  // 4. Return processed slides
 
-/**
- * Chat message for conversation history
- */
-export interface Message {
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  timestamp: number;
-  isGenerating?: boolean;  // For streaming UI feedback
-  metadata?: {
-    tokensUsed?: number;
-    model?: string;
-    latencyMs?: number;
-  };
+  return NextResponse.json({ slides: [], explanation: '' });
 }
+```
 
-/**
- * LLM generation request configuration
- */
-export interface GenerationRequest {
-  prompt: string;
-  mode: AgentMode;
-  existingSlides: SlideContent[];
-  history: Message[];
-  activeSlideIndex: number;
-  options?: {
-    temperature?: number;
-    maxTokens?: number;
-    streaming?: boolean;
-  };
-}
+### `/api/projects` — CRUD Operations
 
-/**
- * LLM generation response
- */
-export interface GenerationResponse {
-  slides: SlideContent[];
-  explanation: string;
-  metadata: {
-    plannerModel: string;
-    architectModel: string;
-    totalLatencyMs: number;
-    imagesGenerated: number;
-  };
-}
-
-/**
- * Image generation request for placeholder replacement
- */
-export interface ImagePromptRequest {
-  placeholder: string;  // e.g., "{{IMG_0}}"
-  prompt: string;       // Detailed visual description
-  aspectRatio?: '16:9' | '1:1' | '4:3' | '9:16';
-}
-
-/**
- * Quick start templates for onboarding
- */
-export interface QuickStartExample {
-  title: string;
-  prompt: string;
-  icon: string;
-  category?: 'business' | 'creative' | 'education' | 'personal';
-}
+```typescript
+// GET /api/projects — List user projects
+// POST /api/projects — Create new project
+// GET /api/projects/[id] — Get single project
+// PUT /api/projects/[id] — Update project
+// DELETE /api/projects/[id] — Delete project
 ```
 
 ---
 
-## Core Integration Modules
-
-### Provider Interface
+## 7. LLM Provider Interface
 
 Create `lib/ai/provider.ts`:
 
 ```typescript
-import { Message } from '../types';
-
-/**
- * Abstract interface for LLM providers
- * Implement this for any LLM: OpenAI, Anthropic, Google, Mistral, local models, etc.
- */
 export interface LLMProvider {
   name: string;
   
-  /**
-   * Generate text completion
-   */
   generateText(params: {
     model: string;
     messages: Array<{ role: string; content: string }>;
@@ -195,1257 +193,155 @@ export interface LLMProvider {
     maxTokens?: number;
   }): Promise<string>;
   
-  /**
-   * Generate structured JSON output
-   */
   generateJSON<T>(params: {
     model: string;
     messages: Array<{ role: string; content: string }>;
     systemPrompt?: string;
     schema: JSONSchema;
-    temperature?: number;
   }): Promise<T>;
   
-  /**
-   * Stream text completion (for real-time UI updates)
-   */
   streamText(params: {
     model: string;
     messages: Array<{ role: string; content: string }>;
-    systemPrompt?: string;
     onChunk: (chunk: string) => void;
   }): Promise<void>;
 }
 
-/**
- * Abstract interface for Image Generation providers
- */
 export interface ImageProvider {
   name: string;
   
-  /**
-   * Generate image from text prompt
-   * @returns base64 encoded image data
-   */
   generateImage(params: {
     prompt: string;
-    aspectRatio?: string;
+    aspectRatio?: '16:9' | '1:1' | '9:16';
     style?: 'photorealistic' | 'illustration' | 'abstract';
-    quality?: 'standard' | 'hd';
-  }): Promise<string | undefined>;
-}
-
-/**
- * JSON Schema type for structured outputs
- */
-export interface JSONSchema {
-  type: string;
-  properties?: Record<string, JSONSchema>;
-  items?: JSONSchema;
-  required?: string[];
-  description?: string;
-  enum?: string[];
+  }): Promise<string | undefined>; // Returns base64
 }
 ```
 
 ---
 
-## LLM Provider Abstraction
+## 8. Type System
 
-### OpenAI Implementation
-
-Create `lib/ai/providers/openai.ts`:
+Create `lib/types.ts`:
 
 ```typescript
-import OpenAI from 'openai';
-import { LLMProvider, ImageProvider, JSONSchema } from '../provider';
-
-export class OpenAIProvider implements LLMProvider, ImageProvider {
-  name = 'openai';
-  private client: OpenAI;
-  
-  constructor(apiKey?: string) {
-    this.client = new OpenAI({
-      apiKey: apiKey || process.env.OPENAI_API_KEY,
-    });
-  }
-  
-  async generateText(params: {
-    model: string;
-    messages: Array<{ role: string; content: string }>;
-    systemPrompt?: string;
-    temperature?: number;
-    maxTokens?: number;
-  }): Promise<string> {
-    const messages: OpenAI.ChatCompletionMessageParam[] = [];
-    
-    if (params.systemPrompt) {
-      messages.push({ role: 'system', content: params.systemPrompt });
-    }
-    
-    messages.push(...params.messages.map(m => ({
-      role: m.role as 'user' | 'assistant',
-      content: m.content,
-    })));
-    
-    const response = await this.client.chat.completions.create({
-      model: params.model || 'gpt-4o',
-      messages,
-      temperature: params.temperature ?? 0.7,
-      max_tokens: params.maxTokens ?? 4096,
-    });
-    
-    return response.choices[0]?.message?.content || '';
-  }
-  
-  async generateJSON<T>(params: {
-    model: string;
-    messages: Array<{ role: string; content: string }>;
-    systemPrompt?: string;
-    schema: JSONSchema;
-    temperature?: number;
-  }): Promise<T> {
-    const messages: OpenAI.ChatCompletionMessageParam[] = [];
-    
-    if (params.systemPrompt) {
-      messages.push({ role: 'system', content: params.systemPrompt });
-    }
-    
-    messages.push(...params.messages.map(m => ({
-      role: m.role as 'user' | 'assistant',
-      content: m.content,
-    })));
-    
-    const response = await this.client.chat.completions.create({
-      model: params.model || 'gpt-4o',
-      messages,
-      temperature: params.temperature ?? 0.3,
-      response_format: {
-        type: 'json_schema',
-        json_schema: {
-          name: 'slide_response',
-          schema: params.schema,
-          strict: true,
-        },
-      },
-    });
-    
-    const content = response.choices[0]?.message?.content || '{}';
-    return JSON.parse(content) as T;
-  }
-  
-  async streamText(params: {
-    model: string;
-    messages: Array<{ role: string; content: string }>;
-    systemPrompt?: string;
-    onChunk: (chunk: string) => void;
-  }): Promise<void> {
-    const messages: OpenAI.ChatCompletionMessageParam[] = [];
-    
-    if (params.systemPrompt) {
-      messages.push({ role: 'system', content: params.systemPrompt });
-    }
-    
-    messages.push(...params.messages.map(m => ({
-      role: m.role as 'user' | 'assistant',
-      content: m.content,
-    })));
-    
-    const stream = await this.client.chat.completions.create({
-      model: params.model || 'gpt-4o',
-      messages,
-      stream: true,
-    });
-    
-    for await (const chunk of stream) {
-      const delta = chunk.choices[0]?.delta?.content;
-      if (delta) params.onChunk(delta);
-    }
-  }
-  
-  async generateImage(params: {
-    prompt: string;
-    aspectRatio?: string;
-    style?: 'photorealistic' | 'illustration' | 'abstract';
-    quality?: 'standard' | 'hd';
-  }): Promise<string | undefined> {
-    try {
-      // Map aspect ratio to DALL-E sizes
-      const sizeMap: Record<string, '1024x1024' | '1792x1024' | '1024x1792'> = {
-        '16:9': '1792x1024',
-        '1:1': '1024x1024',
-        '9:16': '1024x1792',
-      };
-      
-      const response = await this.client.images.generate({
-        model: 'dall-e-3',
-        prompt: `${params.prompt}. Style: ${params.style || 'photorealistic'}, professional quality.`,
-        n: 1,
-        size: sizeMap[params.aspectRatio || '16:9'] || '1792x1024',
-        quality: params.quality === 'hd' ? 'hd' : 'standard',
-        response_format: 'b64_json',
-      });
-      
-      const data = response.data[0]?.b64_json;
-      return data ? `data:image/png;base64,${data}` : undefined;
-    } catch (err: any) {
-      console.warn('OpenAI image generation failed:', err?.message);
-      return undefined;
-    }
-  }
+export enum AgentMode {
+  SLIDE = 'SLIDE',   // 16:9 presentation
+  POSTER = 'POSTER'  // Portrait format
 }
-```
 
-### Anthropic Implementation
-
-Create `lib/ai/providers/anthropic.ts`:
-
-```typescript
-import Anthropic from '@anthropic-ai/sdk';
-import { LLMProvider, JSONSchema } from '../provider';
-
-export class AnthropicProvider implements LLMProvider {
-  name = 'anthropic';
-  private client: Anthropic;
-  
-  constructor(apiKey?: string) {
-    this.client = new Anthropic({
-      apiKey: apiKey || process.env.ANTHROPIC_API_KEY,
-    });
-  }
-  
-  async generateText(params: {
-    model: string;
-    messages: Array<{ role: string; content: string }>;
-    systemPrompt?: string;
-    temperature?: number;
-    maxTokens?: number;
-  }): Promise<string> {
-    const response = await this.client.messages.create({
-      model: params.model || 'claude-sonnet-4-20250514',
-      max_tokens: params.maxTokens || 4096,
-      system: params.systemPrompt,
-      messages: params.messages.map(m => ({
-        role: m.role === 'assistant' ? 'assistant' : 'user',
-        content: m.content,
-      })),
-    });
-    
-    return response.content[0]?.type === 'text' 
-      ? response.content[0].text 
-      : '';
-  }
-  
-  async generateJSON<T>(params: {
-    model: string;
-    messages: Array<{ role: string; content: string }>;
-    systemPrompt?: string;
-    schema: JSONSchema;
-    temperature?: number;
-  }): Promise<T> {
-    const schemaInstruction = `
-Respond ONLY with valid JSON matching this exact schema:
-${JSON.stringify(params.schema, null, 2)}
-
-Do not include any text before or after the JSON.`;
-
-    const response = await this.client.messages.create({
-      model: params.model || 'claude-sonnet-4-20250514',
-      max_tokens: 8192,
-      system: `${params.systemPrompt}\n\n${schemaInstruction}`,
-      messages: params.messages.map(m => ({
-        role: m.role === 'assistant' ? 'assistant' : 'user',
-        content: m.content,
-      })),
-    });
-    
-    const text = response.content[0]?.type === 'text' 
-      ? response.content[0].text 
-      : '{}';
-    
-    // Extract JSON from potential markdown code blocks
-    const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, text];
-    return JSON.parse(jsonMatch[1]?.trim() || '{}') as T;
-  }
-  
-  async streamText(params: {
-    model: string;
-    messages: Array<{ role: string; content: string }>;
-    systemPrompt?: string;
-    onChunk: (chunk: string) => void;
-  }): Promise<void> {
-    const stream = await this.client.messages.stream({
-      model: params.model || 'claude-sonnet-4-20250514',
-      max_tokens: 4096,
-      system: params.systemPrompt,
-      messages: params.messages.map(m => ({
-        role: m.role === 'assistant' ? 'assistant' : 'user',
-        content: m.content,
-      })),
-    });
-    
-    for await (const event of stream) {
-      if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-        params.onChunk(event.delta.text);
-      }
-    }
-  }
+export interface SlideContent {
+  id: string;
+  title: string;
+  code: string;  // Tailwind HTML
+  imageAssets: Record<string, string>;  // {{IMG_0}} → base64
 }
-```
 
-### Google Gemini Implementation
+export interface Project {
+  id: string;
+  title: string;
+  mode: AgentMode;
+  slides: SlideContent[];
+  history: Message[];
+  createdAt: number;
+}
 
-Create `lib/ai/providers/gemini.ts`:
+export interface Message {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  timestamp: number;
+  isGenerating?: boolean;
+}
 
-```typescript
-import { GoogleGenAI, Type } from '@google/genai';
-import { LLMProvider, ImageProvider, JSONSchema } from '../provider';
-
-export class GeminiProvider implements LLMProvider, ImageProvider {
-  name = 'gemini';
-  private client: GoogleGenAI;
-  
-  constructor(apiKey?: string) {
-    this.client = new GoogleGenAI({
-      apiKey: apiKey || process.env.GOOGLE_API_KEY,
-    });
-  }
-  
-  private convertToGeminiSchema(schema: JSONSchema): any {
-    const typeMap: Record<string, any> = {
-      string: Type.STRING,
-      number: Type.NUMBER,
-      boolean: Type.BOOLEAN,
-      object: Type.OBJECT,
-      array: Type.ARRAY,
-    };
-    
-    const result: any = {
-      type: typeMap[schema.type] || Type.STRING,
-    };
-    
-    if (schema.description) result.description = schema.description;
-    if (schema.enum) result.enum = schema.enum;
-    if (schema.required) result.required = schema.required;
-    
-    if (schema.properties) {
-      result.properties = {};
-      for (const [key, value] of Object.entries(schema.properties)) {
-        result.properties[key] = this.convertToGeminiSchema(value);
-      }
-    }
-    
-    if (schema.items) {
-      result.items = this.convertToGeminiSchema(schema.items);
-    }
-    
-    return result;
-  }
-  
-  async generateText(params: {
-    model: string;
-    messages: Array<{ role: string; content: string }>;
-    systemPrompt?: string;
-    temperature?: number;
-    maxTokens?: number;
-  }): Promise<string> {
-    const contents = params.messages.map(m => ({
-      role: m.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: m.content }],
-    }));
-    
-    const response = await this.client.models.generateContent({
-      model: params.model || 'gemini-2.5-flash-preview-05-20',
-      contents,
-      config: {
-        systemInstruction: params.systemPrompt,
-        temperature: params.temperature,
-        maxOutputTokens: params.maxTokens,
-      },
-    });
-    
-    return response.text || '';
-  }
-  
-  async generateJSON<T>(params: {
-    model: string;
-    messages: Array<{ role: string; content: string }>;
-    systemPrompt?: string;
-    schema: JSONSchema;
-    temperature?: number;
-  }): Promise<T> {
-    const contents = params.messages.map(m => ({
-      role: m.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: m.content }],
-    }));
-    
-    const response = await this.client.models.generateContent({
-      model: params.model || 'gemini-2.5-pro-preview',
-      contents,
-      config: {
-        systemInstruction: params.systemPrompt,
-        responseMimeType: 'application/json',
-        responseSchema: this.convertToGeminiSchema(params.schema),
-        temperature: params.temperature ?? 0.3,
-      },
-    });
-    
-    return JSON.parse(response.text || '{}') as T;
-  }
-  
-  async streamText(params: {
-    model: string;
-    messages: Array<{ role: string; content: string }>;
-    systemPrompt?: string;
-    onChunk: (chunk: string) => void;
-  }): Promise<void> {
-    const contents = params.messages.map(m => ({
-      role: m.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: m.content }],
-    }));
-    
-    const stream = await this.client.models.generateContentStream({
-      model: params.model || 'gemini-2.5-flash-preview-05-20',
-      contents,
-      config: { systemInstruction: params.systemPrompt },
-    });
-    
-    for await (const chunk of stream) {
-      params.onChunk(chunk.text || '');
-    }
-  }
-  
-  async generateImage(params: {
-    prompt: string;
-    aspectRatio?: string;
-  }): Promise<string | undefined> {
-    try {
-      const response = await this.client.models.generateContent({
-        model: 'gemini-2.0-flash-exp-image-generation',
-        contents: {
-          parts: [{ text: `${params.prompt}. High-end professional photography.` }],
-        },
-        config: {
-          responseModalities: ['IMAGE', 'TEXT'],
-          imageConfig: { aspectRatio: params.aspectRatio || '16:9' },
-        },
-      });
-      
-      for (const part of response.candidates?.[0]?.content?.parts || []) {
-        if (part.inlineData) {
-          return `data:image/png;base64,${part.inlineData.data}`;
-        }
-      }
-    } catch (err: any) {
-      console.warn('Gemini image generation failed:', err?.message);
-    }
-    return undefined;
-  }
+export interface GenerationRequest {
+  prompt: string;
+  mode: AgentMode;
+  existingSlides: SlideContent[];
+  history: Message[];
+  activeSlideIndex: number;
 }
 ```
 
 ---
 
-## Multi-Agent Workflow
+## 9. Security: Handling "Dangerous" HTML
 
-Create `lib/ai/agents/slideGenerator.ts`:
+Rendering AI-generated HTML is a security risk (XSS).
 
-```typescript
-import { LLMProvider, ImageProvider } from '../provider';
-import { 
-  SlideContent, 
-  AgentMode, 
-  Message, 
-  GenerationRequest, 
-  GenerationResponse,
-  ImagePromptRequest 
-} from '../../types';
+### Step 1: Sanitization
 
-/**
- * Slide generation response schema for structured output
- */
-const SLIDE_RESPONSE_SCHEMA = {
-  type: 'object',
-  properties: {
-    slides: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: {
-          id: { type: 'string', description: 'Unique slide identifier' },
-          title: { type: 'string', description: 'Slide title' },
-          code: { 
-            type: 'string', 
-            description: 'Raw HTML with Tailwind classes. Use {{IMG_0}}, {{IMG_1}} as image placeholders.' 
-          },
-          imagePrompts: {
-            type: 'array',
-            items: {
-              type: 'object',
-              properties: {
-                placeholder: { type: 'string' },
-                prompt: { type: 'string', description: 'Detailed visual description for image generation' },
-              },
-              required: ['placeholder', 'prompt'],
-            },
-          },
-        },
-        required: ['id', 'title', 'code', 'imagePrompts'],
-      },
-    },
-  },
-  required: ['slides'],
-};
+Use `isomorphic-dompurify` on the server or client to strip out `<script>`, `<iframe>`, and `on*` event handlers.
 
-/**
- * Multi-agent slide generation orchestrator
- */
-export class SlideGenerator {
-  private llm: LLMProvider;
-  private imageGen: ImageProvider;
-  
-  // Model configuration - customize per provider
-  private plannerModel: string;
-  private architectModel: string;
-  
-  constructor(
-    llmProvider: LLMProvider,
-    imageProvider: ImageProvider,
-    config?: {
-      plannerModel?: string;
-      architectModel?: string;
-    }
-  ) {
-    this.llm = llmProvider;
-    this.imageGen = imageProvider;
-    this.plannerModel = config?.plannerModel || 'default';
-    this.architectModel = config?.architectModel || 'default';
-  }
-  
-  /**
-   * Format conversation history for LLM consumption
-   */
-  private formatHistory(history: Message[]): Array<{ role: string; content: string }> {
-    return history
-      .filter(msg => msg.role !== 'system')
-      .map(msg => ({
-        role: msg.role,
-        content: msg.content,
-      }));
-  }
-  
-  /**
-   * AGENT 1: Narrative Planner
-   * Understands user intent and creates a high-level plan
-   */
-  private async getNarrativePlan(
-    prompt: string,
-    history: Message[],
-    activeSlideIndex: number,
-    existingSlides: SlideContent[]
-  ): Promise<string> {
-    const systemPrompt = `You are a master of storytelling and design strategy for presentations.
+### Step 2: The Iframe Sandbox
 
-CONTEXT:
-- The user is currently viewing Slide ${activeSlideIndex + 1} of ${existingSlides.length || 'a new deck'}
-- Current slide titles: ${existingSlides.map((s, i) => `[${i + 1}] ${s.title}`).join(', ') || 'None yet'}
+In Next.js, render the code inside a **sandboxed iframe**:
 
-YOUR TASK:
-1. Analyze the user's request
-2. Determine the operation type:
-   - EDIT: Modify the current slide (index ${activeSlideIndex})
-   - ADD: Insert new slide(s) at a specific position
-   - RESTRUCTURE: Reorganize or regenerate multiple slides
-   - DELETE: Remove specific slides
-3. Provide a clear, concise plan explaining:
-   - What changes will be made
-   - Why this approach serves the user's goals
-   - Any creative suggestions to enhance the presentation
-
-Be conversational and helpful. Keep explanations under 100 words.`;
-
-    const formattedHistory = this.formatHistory(history);
-    
-    return this.llm.generateText({
-      model: this.plannerModel,
-      messages: [...formattedHistory, { role: 'user', content: prompt }],
-      systemPrompt,
-      temperature: 0.7,
-    });
-  }
-  
-  /**
-   * AGENT 2: UI Architect
-   * Generates structured slide content with Tailwind HTML
-   */
-  private async generateSlideStructure(
-    plan: string,
-    mode: AgentMode,
-    existingSlides: SlideContent[],
-    activeSlideIndex: number
-  ): Promise<Array<SlideContent & { imagePrompts: ImagePromptRequest[] }>> {
-    const aspectRatio = mode === AgentMode.SLIDE ? '16:9' : '9:16';
-    
-    const systemPrompt = `You are a world-class UI Architect specializing in presentation design.
-
-CRITICAL RULES:
-1. Generate ONLY valid Tailwind CSS classes (no custom CSS)
-2. Use ${aspectRatio} aspect ratio layouts
-3. Image placeholders: Use {{IMG_0}}, {{IMG_1}}, etc. for dynamic images
-4. Preserve existing slide IDs when editing (don't change IDs)
-5. Generate unique IDs for new slides (format: slide_<random>)
-
-DESIGN PRINCIPLES:
-- Clean, modern, professional aesthetics
-- High contrast for readability
-- Consistent typography hierarchy
-- Strategic use of whitespace
-- Visual balance and alignment
-
-SLIDE TYPES TO USE:
-- metrics: KPI dashboards with hero numbers
-- bullets: Key points with visual hierarchy  
-- chart: Data visualization placeholder
-- title: Section headers and closings
-- comparison: Side-by-side analysis
-- quote: Testimonials and callouts
-- image: Full-bleed visual slides
-
-For each image placeholder, provide a detailed prompt for generation.`;
-
-    const userContent = `
-PLAN: ${plan}
-ACTIVE_SLIDE_INDEX: ${activeSlideIndex}
-EXISTING_SLIDES: ${JSON.stringify(existingSlides, null, 2)}
-
-Based on this plan, generate the updated slides array.`;
-
-    const result = await this.llm.generateJSON<{
-      slides: Array<SlideContent & { imagePrompts: ImagePromptRequest[] }>;
-    }>({
-      model: this.architectModel,
-      messages: [{ role: 'user', content: userContent }],
-      systemPrompt,
-      schema: SLIDE_RESPONSE_SCHEMA,
-      temperature: 0.3,
-    });
-    
-    return result.slides;
-  }
-  
-  /**
-   * AGENT 3: Image Generator
-   * Converts text prompts to visual assets
-   */
-  private async generateImage(prompt: string): Promise<string | undefined> {
-    return this.imageGen.generateImage({
-      prompt,
-      aspectRatio: '16:9',
-      style: 'photorealistic',
-      quality: 'hd',
-    });
-  }
-  
-  /**
-   * Main generation pipeline
-   */
-  async generate(request: GenerationRequest): Promise<GenerationResponse> {
-    const startTime = Date.now();
-    let imagesGenerated = 0;
-    
-    // Step 1: Get narrative plan
-    const explanation = await this.getNarrativePlan(
-      request.prompt,
-      request.history,
-      request.activeSlideIndex,
-      request.existingSlides
-    );
-    
-    // Step 2: Generate slide structure
-    const rawSlides = await this.generateSlideStructure(
-      explanation,
-      request.mode,
-      request.existingSlides,
-      request.activeSlideIndex
-    );
-    
-    // Step 3: Process slides and generate images
-    const processedSlides: SlideContent[] = [];
-    
-    for (const slide of rawSlides) {
-      const needsImages = slide.code.includes('{{IMG_');
-      const assets: Record<string, string> = {};
-      
-      if (needsImages && slide.imagePrompts?.length) {
-        // Generate images in parallel for speed
-        const imagePromises = slide.imagePrompts.map(async (req) => {
-          const base64 = await this.generateImage(req.prompt);
-          if (base64) {
-            assets[req.placeholder] = base64;
-            imagesGenerated++;
-          }
-        });
-        
-        await Promise.all(imagePromises);
-      }
-      
-      // Replace placeholders with generated images
-      let finalCode = slide.code;
-      for (const [placeholder, dataUrl] of Object.entries(assets)) {
-        finalCode = finalCode.replaceAll(placeholder, dataUrl);
-      }
-      
-      processedSlides.push({
-        id: slide.id || `slide_${Math.random().toString(36).substr(2, 9)}`,
-        title: slide.title,
-        code: finalCode,
-        imageAssets: assets,
-      });
-    }
-    
-    return {
-      slides: processedSlides,
-      explanation,
-      metadata: {
-        plannerModel: this.plannerModel,
-        architectModel: this.architectModel,
-        totalLatencyMs: Date.now() - startTime,
-        imagesGenerated,
-      },
-    };
-  }
-}
+```html
+<iframe 
+  sandbox="allow-popups allow-forms" 
+  srcDoc={sanitizedCode} 
+  className="w-full h-full border-none"
+/>
 ```
 
 ---
 
-## API Routes
+## 10. Scaling for High Traffic (The "Million Slide" Strategy)
 
-Create `app/api/generate/route.ts`:
+If you have 20,000 users each generating 50 slides, you will reach **1,000,000 slides**.
 
-```typescript
-import { NextRequest, NextResponse } from 'next/server';
-import { SlideGenerator } from '@/lib/ai/agents/slideGenerator';
-import { OpenAIProvider } from '@/lib/ai/providers/openai';
-import { AnthropicProvider } from '@/lib/ai/providers/anthropic';
-import { GeminiProvider } from '@/lib/ai/providers/gemini';
-import { GenerationRequest } from '@/lib/types';
+### A. The "Hybrid Storage" Pattern
 
-// Initialize providers based on environment
-function getProviders() {
-  const llmProvider = process.env.LLM_PROVIDER || 'openai';
-  const imageProvider = process.env.IMAGE_PROVIDER || 'openai';
-  
-  const providers = {
-    openai: () => new OpenAIProvider(),
-    anthropic: () => new AnthropicProvider(),
-    gemini: () => new GeminiProvider(),
-  };
-  
-  const llm = providers[llmProvider as keyof typeof providers]?.() 
-    || providers.openai();
-  
-  const imageGen = providers[imageProvider as keyof typeof providers]?.() 
-    || providers.openai();
-  
-  return { llm, imageGen };
-}
+1. **Postgres:** Stores only metadata (slide ID, title, order, `storageKey`).
+2. **Object Storage (S3 / Vercel Blob):** Stores the actual HTML/JSON file.
 
-export async function POST(request: NextRequest) {
-  try {
-    const body: GenerationRequest = await request.json();
-    
-    // Validate required fields
-    if (!body.prompt) {
-      return NextResponse.json(
-        { error: 'Prompt is required' },
-        { status: 400 }
-      );
-    }
-    
-    const { llm, imageGen } = getProviders();
-    
-    const generator = new SlideGenerator(llm, imageGen, {
-      plannerModel: process.env.PLANNER_MODEL,
-      architectModel: process.env.ARCHITECT_MODEL,
-    });
-    
-    const result = await generator.generate({
-      prompt: body.prompt,
-      mode: body.mode || 'SLIDE',
-      existingSlides: body.existingSlides || [],
-      history: body.history || [],
-      activeSlideIndex: body.activeSlideIndex || 0,
-      options: body.options,
-    });
-    
-    return NextResponse.json(result);
-    
-  } catch (error: any) {
-    console.error('Generation failed:', error);
-    return NextResponse.json(
-      { error: error.message || 'Generation failed' },
-      { status: 500 }
-    );
-  }
-}
-```
+### B. Caching & Edge Performance
 
-### Streaming API Route
+- **Redis (Upstash):** Cache the "Current Active Project" in Redis. Flush to DB every 60 seconds.
+- **CDN:** Serve generated HTML through CDN with long TTL.
 
-Create `app/api/generate/stream/route.ts`:
+### C. LLM Context Compression
 
-```typescript
-import { NextRequest } from 'next/server';
-import { OpenAIProvider } from '@/lib/ai/providers/openai';
+Only send the *Current Slide*, the *Previous 2*, and the *Next 1* as full code. For all other slides, send only a "Summary" (Title + Brief Description).
 
-export async function POST(request: NextRequest) {
-  const { prompt, history, systemPrompt } = await request.json();
-  
-  const encoder = new TextEncoder();
-  const stream = new ReadableStream({
-    async start(controller) {
-      const provider = new OpenAIProvider();
-      
-      await provider.streamText({
-        model: process.env.PLANNER_MODEL || 'gpt-4o',
-        messages: [...history, { role: 'user', content: prompt }],
-        systemPrompt,
-        onChunk: (chunk) => {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: chunk })}\n\n`));
-        },
-      });
-      
-      controller.enqueue(encoder.encode('data: [DONE]\n\n'));
-      controller.close();
-    },
-  });
-  
-  return new Response(stream, {
-    headers: {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
-    },
-  });
-}
+### D. Database Indexing
+
+```sql
+CREATE INDEX idx_project_slides ON "Slide" ("projectId", "order");
 ```
 
 ---
 
-## Frontend Integration
+## 11. Next Steps for Implementation
 
-### Generation Hook
+### Priority 1: Core AI Integration
 
-Create `lib/hooks/useSlideGeneration.ts`:
+- [ ] Set up `lib/ai/providers/gemini.ts` with Google Gemini SDK
+- [ ] Create `lib/ai/agents/slideGenerator.ts` orchestrator
+- [ ] Wire `/api/generate` route to ChatPanel
 
-```typescript
-import { useState, useCallback } from 'react';
-import { SlideContent, Message, AgentMode, GenerationResponse } from '../types';
+### Priority 2: State Management
 
-interface UseSlideGenerationOptions {
-  onExplanation?: (text: string) => void;
-  onSlideGenerated?: (slide: SlideContent) => void;
-  onComplete?: (response: GenerationResponse) => void;
-  onError?: (error: Error) => void;
-}
+- [ ] Create project context with useReducer or Zustand
+- [ ] Persist to localStorage for offline demo
+- [ ] Add optimistic UI updates during generation
 
-export function useSlideGeneration(options: UseSlideGenerationOptions = {}) {
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [explanation, setExplanation] = useState('');
-  
-  const generate = useCallback(async (
-    prompt: string,
-    mode: AgentMode,
-    existingSlides: SlideContent[],
-    history: Message[],
-    activeSlideIndex: number
-  ) => {
-    setIsGenerating(true);
-    setProgress(0);
-    setExplanation('');
-    
-    try {
-      // Phase 1: Planning (stream explanation)
-      setProgress(10);
-      
-      const response = await fetch('/api/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt,
-          mode,
-          existingSlides,
-          history,
-          activeSlideIndex,
-        }),
-      });
-      
-      if (!response.ok) {
-        throw new Error(await response.text());
-      }
-      
-      const result: GenerationResponse = await response.json();
-      
-      setExplanation(result.explanation);
-      options.onExplanation?.(result.explanation);
-      
-      // Phase 2: Slide generation
-      setProgress(50);
-      
-      for (const slide of result.slides) {
-        options.onSlideGenerated?.(slide);
-        setProgress(prev => Math.min(prev + (40 / result.slides.length), 90));
-      }
-      
-      setProgress(100);
-      options.onComplete?.(result);
-      
-      return result;
-      
-    } catch (error: any) {
-      options.onError?.(error);
-      throw error;
-    } finally {
-      setIsGenerating(false);
-    }
-  }, [options]);
-  
-  return {
-    generate,
-    isGenerating,
-    progress,
-    explanation,
-  };
-}
-```
+### Priority 3: Authentication & Persistence
 
-### Updated Page Component
+- [ ] Integrate Clerk or NextAuth
+- [ ] Set up Prisma with Postgres (Supabase/Neon)
+- [ ] Add project CRUD API routes
 
-Update `app/p/[id]/page.tsx` integration:
+### Priority 4: Polish
 
-```typescript
-"use client";
-
-import * as React from "react";
-import { useParams } from "next/navigation";
-import { TopBar } from "@/components/workspace/TopBar";
-import { ChatPanel } from "@/components/workspace/ChatPanel";
-import { SlidePreview } from "@/components/workspace/SlidePreview";
-import { ThumbnailStrip } from "@/components/workspace/ThumbnailStrip";
-import { useSlideGeneration } from "@/lib/hooks/useSlideGeneration";
-import { SlideContent, Message, AgentMode } from "@/lib/types";
-
-export default function ProjectPage() {
-  const params = useParams();
-  const projectId = params?.id as string;
-
-  const [slides, setSlides] = React.useState<SlideContent[]>([]);
-  const [messages, setMessages] = React.useState<Message[]>([
-    { 
-      role: "assistant", 
-      content: "I'm your slide design assistant. Describe what you'd like to create!",
-      timestamp: Date.now()
-    },
-  ]);
-  const [input, setInput] = React.useState("");
-  const [currentSlideIndex, setCurrentSlideIndex] = React.useState(0);
-
-  const { generate, isGenerating, explanation } = useSlideGeneration({
-    onExplanation: (text) => {
-      setMessages(prev => [...prev, {
-        role: "assistant",
-        content: text,
-        timestamp: Date.now(),
-      }]);
-    },
-    onComplete: (response) => {
-      setSlides(response.slides);
-      setMessages(prev => [...prev, {
-        role: "assistant",
-        content: `Done! Generated ${response.slides.length} slides in ${(response.metadata.totalLatencyMs / 1000).toFixed(1)}s.`,
-        timestamp: Date.now(),
-      }]);
-    },
-    onError: (error) => {
-      setMessages(prev => [...prev, {
-        role: "assistant",
-        content: `Error: ${error.message}. Please try again.`,
-        timestamp: Date.now(),
-      }]);
-    },
-  });
-
-  const handleSendMessage = async () => {
-    if (!input.trim() || isGenerating) return;
-    
-    const userMessage: Message = {
-      role: "user",
-      content: input.trim(),
-      timestamp: Date.now(),
-    };
-    
-    setMessages(prev => [...prev, userMessage]);
-    setInput("");
-    
-    await generate(
-      userMessage.content,
-      AgentMode.SLIDE,
-      slides,
-      messages,
-      currentSlideIndex
-    );
-  };
-
-  const currentSlide = slides[currentSlideIndex];
-  const totalSlides = slides.length;
-
-  return (
-    <div className="h-screen bg-background flex flex-col overflow-hidden">
-      <TopBar projectId={projectId} />
-
-      <div className="flex-1 flex overflow-hidden">
-        <ChatPanel
-          messages={messages}
-          input={input}
-          setInput={setInput}
-          onSendMessage={handleSendMessage}
-          isGenerating={isGenerating}
-        />
-
-        <div className="flex-1 bg-black relative flex flex-col">
-          <SlidePreview
-            currentSlide={currentSlide}
-            currentSlideIndex={currentSlideIndex}
-            totalSlides={totalSlides}
-            onNext={() => setCurrentSlideIndex(i => Math.min(i + 1, totalSlides - 1))}
-            onPrev={() => setCurrentSlideIndex(i => Math.max(i - 1, 0))}
-            isLoading={isGenerating && slides.length === 0}
-          />
-
-          <ThumbnailStrip
-            slides={slides}
-            currentSlideIndex={currentSlideIndex}
-            onSelectSlide={setCurrentSlideIndex}
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
-```
+- [ ] Add streaming responses to ChatPanel
+- [ ] Implement slide reordering (drag-and-drop)
+- [ ] Add export to PDF/PPTX functionality
 
 ---
 
-## Error Handling & Resilience
+## 12. Conclusion
 
-Create `lib/ai/utils/retry.ts`:
+The GLM Slide Agent is a journey from **Prompting** to **Orchestration**. By decoupling the Brain (Chat) from the Canvas (Slides), using a multi-agent pipeline, and planning for scale with hybrid storage and context windowing, you create a professional tool that grows with your user base.
 
-```typescript
-interface RetryOptions {
-  maxAttempts?: number;
-  initialDelayMs?: number;
-  maxDelayMs?: number;
-  backoffMultiplier?: number;
-  retryableErrors?: string[];
-}
-
-export async function withRetry<T>(
-  fn: () => Promise<T>,
-  options: RetryOptions = {}
-): Promise<T> {
-  const {
-    maxAttempts = 3,
-    initialDelayMs = 1000,
-    maxDelayMs = 10000,
-    backoffMultiplier = 2,
-    retryableErrors = ['RATE_LIMIT', 'TIMEOUT', 'NETWORK'],
-  } = options;
-  
-  let lastError: Error | undefined;
-  let delay = initialDelayMs;
-  
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      return await fn();
-    } catch (error: any) {
-      lastError = error;
-      
-      const isRetryable = retryableErrors.some(code => 
-        error.message?.includes(code) || error.code === code
-      );
-      
-      if (!isRetryable || attempt === maxAttempts) {
-        throw error;
-      }
-      
-      console.warn(`Attempt ${attempt} failed, retrying in ${delay}ms...`);
-      await new Promise(resolve => setTimeout(resolve, delay));
-      delay = Math.min(delay * backoffMultiplier, maxDelayMs);
-    }
-  }
-  
-  throw lastError;
-}
-
-/**
- * Rate limiter for API calls
- */
-export class RateLimiter {
-  private queue: Array<() => void> = [];
-  private processing = false;
-  private lastCall = 0;
-  
-  constructor(private minIntervalMs: number = 100) {}
-  
-  async acquire(): Promise<void> {
-    return new Promise(resolve => {
-      this.queue.push(resolve);
-      this.process();
-    });
-  }
-  
-  private async process() {
-    if (this.processing) return;
-    this.processing = true;
-    
-    while (this.queue.length > 0) {
-      const now = Date.now();
-      const elapsed = now - this.lastCall;
-      
-      if (elapsed < this.minIntervalMs) {
-        await new Promise(r => setTimeout(r, this.minIntervalMs - elapsed));
-      }
-      
-      this.lastCall = Date.now();
-      const next = this.queue.shift();
-      next?.();
-    }
-    
-    this.processing = false;
-  }
-}
-```
-
----
-
-## Environment Configuration
-
-Create `.env.example`:
-
-```bash
-# ===========================================
-# GLM Slide Agent - Environment Configuration
-# ===========================================
-
-# LLM Provider Selection
-# Options: openai, anthropic, gemini
-LLM_PROVIDER=openai
-IMAGE_PROVIDER=openai
-
-# OpenAI Configuration
-OPENAI_API_KEY=sk-...
-OPENAI_ORG_ID=org-...  # Optional
-
-# Anthropic Configuration  
-ANTHROPIC_API_KEY=sk-ant-...
-
-# Google Gemini Configuration
-GOOGLE_API_KEY=AIza...
-
-# Model Configuration
-# Override default models per agent
-PLANNER_MODEL=gpt-4o-mini        # Fast model for planning
-ARCHITECT_MODEL=gpt-4o           # Pro model for structured output
-
-# For Anthropic:
-# PLANNER_MODEL=claude-3-5-haiku-20241022
-# ARCHITECT_MODEL=claude-sonnet-4-20250514
-
-# For Gemini:
-# PLANNER_MODEL=gemini-2.5-flash-preview-05-20
-# ARCHITECT_MODEL=gemini-2.5-pro-preview
-
-# Rate Limiting
-API_RATE_LIMIT_MS=100            # Minimum ms between API calls
-MAX_RETRIES=3                    # Max retry attempts on failure
-
-# Image Generation
-IMAGE_ENABLED=true               # Enable/disable image generation
-IMAGE_QUALITY=hd                 # 'standard' or 'hd'
-IMAGE_STYLE=photorealistic       # 'photorealistic', 'illustration', 'abstract'
-
-# Development
-NODE_ENV=development
-LOG_LEVEL=debug
-```
-
----
-
-## File Structure Summary
-
-```
-lib/
-├── types.ts                    # Core type definitions
-├── ai/
-│   ├── provider.ts             # Abstract provider interfaces
-│   ├── providers/
-│   │   ├── openai.ts           # OpenAI implementation
-│   │   ├── anthropic.ts        # Anthropic implementation
-│   │   └── gemini.ts           # Google Gemini implementation
-│   ├── agents/
-│   │   └── slideGenerator.ts   # Multi-agent orchestrator
-│   └── utils/
-│       └── retry.ts            # Retry and rate limiting utilities
-└── hooks/
-    └── useSlideGeneration.ts   # React hook for frontend integration
-
-app/
-└── api/
-    └── generate/
-        ├── route.ts            # Main generation endpoint
-        └── stream/
-            └── route.ts        # Streaming endpoint
-```
-
----
-
-## Quick Start Checklist
-
-1. **Install dependencies**:
-   ```bash
-   npm install openai @anthropic-ai/sdk @google/genai
-   ```
-
-2. **Copy environment template**:
-   ```bash
-   cp .env.example .env.local
-   ```
-
-3. **Add your API keys** to `.env.local`
-
-4. **Create the file structure** as outlined above
-
-5. **Update your page component** to use the generation hook
-
-6. **Test the integration**:
-   ```bash
-   npm run dev
-   ```
-
----
-
-## Provider Comparison
-
-| Feature | OpenAI | Anthropic | Gemini |
-|---------|--------|-----------|--------|
-| Structured Output | Native JSON Schema | Prompt-based | Native Schema |
-| Streaming | ✅ SSE | ✅ SSE | ✅ SSE |
-| Image Generation | DALL-E 3 | ❌ (use OpenAI) | Imagen 3 |
-| Best For | Balanced | Reasoning | Multimodal |
-| Cost | $$ | $$$ | $ |
-
----
-
-> **Next Steps**: This document provides the complete integration specification. Implement incrementally, starting with a single provider, then expand to multi-provider support.
+**Current Status:** Frontend complete. Backend integration pending.
