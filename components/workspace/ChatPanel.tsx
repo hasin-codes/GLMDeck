@@ -36,7 +36,7 @@ export function ChatPanel({ messages, input, setInput, onSendMessage }: ChatPane
                     <Sparkles className="h-4 w-4 text-brand" />
                 </div>
                 <div>
-                    <h2 className="text-sm font-semibold">GLM Agent</h2>
+                    <h2 className="text-sm font-semibold">GLM Deck</h2>
                     <p className="text-[10px] text-muted uppercase tracking-wider">Slide Design Mode</p>
                 </div>
             </div>
@@ -57,7 +57,7 @@ export function ChatPanel({ messages, input, setInput, onSendMessage }: ChatPane
                             {msg.content}
                         </div>
                         <span className="text-[9px] text-muted uppercase tracking-widest px-2">
-                            {msg.role === "user" ? "You" : "GLM Agent"} • {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            {msg.role === "user" ? "You" : "GLM Deck"} • {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
                     </motion.div>
                 ))}

@@ -13,7 +13,7 @@ const outfit = Outfit({
 });
 
 export const metadata: Metadata = {
-  title: "GLM Slide Agent | AI-Powered Presentations",
+  title: "GLM Slide Agent | AI-Powered Pitch Deck",
   description: "Generate professional slides and posters in seconds through conversation.",
   openGraph: {
     title: "GLM Slide Agent | Nano Banana",

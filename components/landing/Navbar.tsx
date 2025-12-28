@@ -11,7 +11,7 @@ export function Navbar() {
                     <Sparkles className="text-black h-6 w-6" fill="currentColor" />
                 </div>
                 <span className="text-xl font-bold tracking-tight bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent">
-                    GLM Agent
+                    GLM Deck
                 </span>
             </Link>
 
