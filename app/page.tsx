@@ -15,7 +15,7 @@ export default function Home() {
   const handleGenerate = () => {
     if (!prompt.trim()) return;
     const id = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 11);
-    router.push(`/p/${id}`);
+    router.push(`/p/${id}?prompt=${encodeURIComponent(prompt)}`);
   };
 
   return (

@@ -81,7 +81,19 @@ export function SlidePreview({ currentSlide, currentSlideIndex, totalSlides, onN
     }
 
     return (
-        <div className="flex-1 bg-black relative flex flex-col">
+        <div className="flex-1 bg-[#050505] relative flex flex-col overflow-hidden">
+            {/* Dark Green Dotted Grid Background */}
+            <div
+                className="absolute inset-0 z-0"
+                style={{
+                    backgroundImage: `
+                        radial-gradient(circle, rgba(52, 178, 123, 0.2) 1.5px, transparent 1.5px)
+                    `,
+                    backgroundSize: "30px 30px",
+                    backgroundPosition: "0 0",
+                }}
+            />
+
             {/* Canvas Area with Transitions */}
             <div className="flex-1 flex items-center justify-center p-12 relative">
                 {/* Slide Navigation Overlay */}

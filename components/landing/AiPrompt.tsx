@@ -33,7 +33,7 @@ export function AiPrompt({ prompt, setPrompt, handleGenerate }: AiPromptProps) {
         <div className="w-full max-w-4xl px-4 md:px-0 animate-in fade-in slide-in-from-bottom-12 duration-1000 delay-200">
             <div
                 className={cn(
-                    "backdrop-blur-md rounded-2xl relative transition-all duration-300",
+                    "rounded-2xl relative transition-all duration-300",
                     isFocused ? "shadow-[0_0_50px_-10px_rgba(52,178,123,0.4)] scale-[1.002]" : "hover:shadow-[0_0_40px_-10px_rgba(52,178,123,0.3)]"
                 )}
                 style={{

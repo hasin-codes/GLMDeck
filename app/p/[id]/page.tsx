@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { TopBar } from "@/components/workspace/TopBar";
 import { ChatPanel } from "@/components/workspace/ChatPanel";
 import { SlidePreview } from "@/components/workspace/SlidePreview";
@@ -63,11 +63,14 @@ const slidesData = [
 
 export default function ProjectPage() {
     const params = useParams();
+    const searchParams = useSearchParams();
     const projectId = params?.id as string;
+    const initialPrompt = searchParams.get("prompt");
 
     const [visibleSlides, setVisibleSlides] = React.useState<typeof slidesData>([]);
     const [isBuilding, setIsBuilding] = React.useState(true);
     const [messages, setMessages] = React.useState([
+        ...(initialPrompt ? [{ role: "user", content: initialPrompt }] : []),
         { role: "ai", content: "I've analyzed your request. I'm now drafting a presentation focused on your requirements. One moment while I synthesize the content..." },
     ]);
     const [input, setInput] = React.useState("");
@@ -122,7 +125,7 @@ export default function ProjectPage() {
 
     return (
         <div className="h-screen bg-background flex flex-col overflow-hidden">
-            <TopBar projectId={projectId} />
+            <TopBar projectId={projectId} hasSlides={visibleSlides.length > 0 && !isBuilding} />
 
             <div className="flex-1 flex overflow-hidden">
                 <ChatPanel

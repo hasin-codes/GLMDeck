@@ -78,7 +78,7 @@ function QuickStartCard({ item, onSelect }: { item: typeof quickStarts[0]; onSel
     return (
         <motion.article
             whileHover={{ y: -4 }}
-            className="group flex flex-col gap-4 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-brand/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-[1.5rem]"
+            className="group flex flex-col gap-4 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-brand/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-xl"
             onClick={onSelect}
             onKeyDown={(e) => e.key === "Enter" && onSelect()}
             tabIndex={0}
@@ -86,7 +86,7 @@ function QuickStartCard({ item, onSelect }: { item: typeof quickStarts[0]; onSel
             aria-label={`Use template: ${item.title}`}
         >
             {/* Thumbnail Container */}
-            <div className="aspect-[16/9] w-full rounded-[1.5rem] bg-surface/50 border border-white/5 overflow-hidden relative shadow-2xl transition-all duration-500 group-hover:border-brand/20 group-hover:shadow-brand/5 group-focus-visible:border-brand/30">
+            <div className="aspect-[16/9] w-full rounded-xl bg-surface/50 border border-white/5 overflow-hidden relative shadow-2xl transition-all duration-500 group-hover:border-brand/20 group-hover:shadow-brand/5 group-focus-visible:border-brand/30">
                 {imgError ? (
                     <div className={`w-full h-full bg-gradient-to-br ${item.gradient} flex items-center justify-center`}>
                         <div className="text-center space-y-2 p-4">
@@ -162,7 +162,7 @@ export function QuickStartGrid({ onSelect }: QuickStartGridProps) {
                 </button>
             </header>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8" role="list">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-[15px]" role="list">
                 {quickStarts.map((item) => (
                     <QuickStartCard
                         key={item.id}
