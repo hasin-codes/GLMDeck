@@ -51,14 +51,14 @@ A major challenge is ensuring the AI knows which slide you want to edit.
 ```
 slides/
 ├── app/
-│   ├── page.tsx              # Landing page (HeroSection + CreationCard + QuickStartGrid)
+│   ├── page.tsx              # Landing page (HeroSection + AiPrompt + QuickStartGrid)
 │   ├── p/[id]/page.tsx       # Workspace (ChatPanel + SlidePreview + ThumbnailStrip)
 │   ├── layout.tsx            # Root layout with Google Fonts + metadata
 │   └── globals.css           # CSS variables + Tailwind v4 theme
 ├── components/
 │   ├── landing/
 │   │   ├── HeroSection.tsx   # Animated hero with gradient text
-│   │   ├── CreationCard.tsx  # Glass-morphism prompt input card
+│   │   ├── AiPrompt.tsx      # Glass-morphism prompt input card
 │   │   ├── QuickStartGrid.tsx# Community gallery with Next/Image + fallbacks
 │   │   ├── Navbar.tsx        # Fixed top nav with glass effect
 │   │   └── Footer.tsx        # Minimal footer
@@ -92,7 +92,7 @@ slides/
 | Component | Status | Description |
 |-----------|--------|-------------|
 | `HeroSection` | ✅ Complete | Animated gradient hero with typewriter effect |
-| `CreationCard` | ✅ Complete | Prompt input with Slide/Poster toggle |
+| `AiPrompt` | ✅ Complete | Prompt input with Slide/Poster toggle |
 | `QuickStartGrid` | ✅ Complete | 6 community cards with Next/Image + fallbacks |
 | `ChatPanel` | ✅ Shell | Message list UI (needs LLM integration) |
 | `SlidePreview` | ✅ Complete | 5 demo slides with metrics layout |

@@ -66,7 +66,7 @@ slides/
 ├── components/
 │   ├── landing/              # Landing page components
 │   │   ├── HeroSection.tsx   # Hero with animated gradient
-│   │   ├── CreationCard.tsx  # Prompt input + format selection
+│   │   ├── AiPrompt.tsx      # Prompt input + format selection
 │   │   ├── QuickStartGrid.tsx# Community gallery cards
 │   │   ├── Navbar.tsx        # Top navigation
 │   │   └── Footer.tsx        # Footer

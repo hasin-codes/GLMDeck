@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -6,14 +5,15 @@ import { ArrowRight, Paperclip, Layout } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAutoResizeTextarea } from "@/hooks/use-auto-resize-textarea";
 import Image from "next/image";
+import { VoiceInput } from "./VoiceInput";
 
-interface CreationCardProps {
+interface AiPromptProps {
     prompt: string;
     setPrompt: (val: string) => void;
     handleGenerate: () => void;
 }
 
-export function CreationCard({ prompt, setPrompt, handleGenerate }: CreationCardProps) {
+export function AiPrompt({ prompt, setPrompt, handleGenerate }: AiPromptProps) {
     const [isFocused, setIsFocused] = useState(false);
     const { textareaRef, adjustHeight } = useAutoResizeTextarea({
         minHeight: 72,
@@ -121,19 +121,23 @@ export function CreationCard({ prompt, setPrompt, handleGenerate }: CreationCard
                                     </div>
                                 </div>
 
-                                <button
-                                    type="button"
-                                    className={cn(
-                                        "rounded-lg p-2 flex-shrink-0 transition-all duration-200",
-                                        prompt.trim()
-                                            ? "bg-brand text-black hover:bg-brand/90 hover:scale-105"
-                                            : "bg-white/5 text-neutral-500 cursor-not-allowed"
-                                    )}
-                                    disabled={!prompt.trim()}
-                                    onClick={handleGenerate}
-                                >
-                                    <ArrowRight className="w-4 h-4" />
-                                </button>
+                                <div className="flex items-center gap-2">
+                                    <VoiceInput />
+
+                                    <button
+                                        type="button"
+                                        className={cn(
+                                            "rounded-lg p-2 flex-shrink-0 transition-all duration-200",
+                                            prompt.trim()
+                                                ? "bg-brand text-black hover:bg-brand/90 hover:scale-105"
+                                                : "bg-white/5 text-neutral-500 cursor-not-allowed"
+                                        )}
+                                        disabled={!prompt.trim()}
+                                        onClick={handleGenerate}
+                                    >
+                                        <ArrowRight className="w-4 h-4" />
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>

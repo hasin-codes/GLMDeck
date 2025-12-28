@@ -4,7 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Navbar } from "@/components/landing/Navbar";
 import { HeroSection } from "@/components/landing/HeroSection";
-import { CreationCard } from "@/components/landing/CreationCard";
+import { AiPrompt } from "@/components/landing/AiPrompt";
 import { QuickStartGrid } from "@/components/landing/QuickStartGrid";
 import { Footer } from "@/components/landing/Footer";
 
@@ -31,7 +31,7 @@ export default function Home() {
       <main className="relative z-10 flex-1 flex flex-col items-center justify-center px-6 py-12 max-w-7xl mx-auto w-full">
         <HeroSection />
 
-        <CreationCard
+        <AiPrompt
           prompt={prompt}
           setPrompt={setPrompt}
           handleGenerate={handleGenerate}
