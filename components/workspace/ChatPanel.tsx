@@ -18,6 +18,16 @@ interface ChatPanelProps {
 }
 
 export function ChatPanel({ messages, input, setInput, onSendMessage }: ChatPanelProps) {
+    const messagesEndRef = React.useRef<HTMLDivElement>(null);
+
+    const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    };
+
+    React.useEffect(() => {
+        scrollToBottom();
+    }, [messages]);
+
     return (
         <div className="w-[420px] border-r border-border bg-surface/20 flex flex-col relative">
             {/* Workspace Header */}
@@ -51,6 +61,7 @@ export function ChatPanel({ messages, input, setInput, onSendMessage }: ChatPane
                         </span>
                     </motion.div>
                 ))}
+                <div ref={messagesEndRef} />
             </div>
 
             {/* Chat Input */}

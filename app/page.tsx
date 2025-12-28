@@ -10,7 +10,6 @@ import { Footer } from "@/components/landing/Footer";
 
 export default function Home() {
   const [prompt, setPrompt] = React.useState("");
-  const [mode, setMode] = React.useState<"slides" | "poster">("slides");
   const router = useRouter();
 
   const handleGenerate = () => {
@@ -35,8 +34,6 @@ export default function Home() {
         <CreationCard
           prompt={prompt}
           setPrompt={setPrompt}
-          mode={mode}
-          setMode={setMode}
           handleGenerate={handleGenerate}
         />
 

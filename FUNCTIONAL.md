@@ -264,7 +264,402 @@ export interface GenerationRequest {
 
 ---
 
-## 9. Security: Handling "Dangerous" HTML
+## 9. Reference Implementation: AI Slide Generation Service
+
+This section provides a **complete pseudo-code reference** for implementing the slide generation service. It is designed to be **LLM-agnostic**—swap `YourLLMProvider` and `YourImageProvider` for any SDK (Gemini, OpenAI, Anthropic, etc.).
+
+### Why Raw HTML + Tailwind?
+
+The UI Architect agent generates **Raw HTML infused with Tailwind CSS utility classes**. This approach is highly effective for several technical reasons:
+
+| Benefit | Explanation |
+|---------|-------------|
+| **Zero Compilation** | Generated code renders immediately via `dangerouslySetInnerHTML` or sandboxed iframe—no build step needed |
+| **Token Efficiency** | Tailwind utilities (`flex items-center justify-between`) are far more concise than full CSS, reducing API cost/latency |
+| **Standardization** | Fixed Tailwind utility set = fewer hallucinated/invalid styles vs. raw CSS |
+| **Asset Injection** | Simple `{{IMG_0}}` placeholders → string replace with Base64 data URIs |
+
+### A. Core Types
+
+```typescript
+// lib/types.ts
+export enum AgentMode {
+  SLIDE = 'SLIDE',
+  POSTER = 'POSTER'
+}
+
+export interface Message {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  timestamp?: number;
+}
+
+export interface SlideContent {
+  id: string;
+  title: string;
+  code: string;  // Raw Tailwind HTML
+  imageAssets: Record<string, string>;  // {{IMG_0}} → base64
+}
+
+export interface ImagePromptRequest {
+  placeholder: string;  // e.g., "{{IMG_0}}"
+  prompt: string;       // e.g., "Modern office with glass walls"
+}
+
+export interface UIArchitectOutput {
+  slides: Array<{
+    id: string;
+    title: string;
+    code: string;
+    imagePrompts: ImagePromptRequest[];
+  }>;
+}
+```
+
+### B. Reference Service Implementation
+
+```typescript
+// lib/ai/services/slideGenerator.ts (PSEUDO-CODE REFERENCE)
+
+import { SlideContent, AgentMode, Message, UIArchitectOutput } from '../types';
+
+// ============================================
+// STEP 1: Initialize your LLM Provider
+// ============================================
+// Replace with your actual SDK initialization:
+// - Google: import { GoogleGenAI } from "@google/genai";
+// - OpenAI: import OpenAI from "openai";
+// - Anthropic: import Anthropic from "@anthropic-ai/sdk";
+
+const llmProvider = new YourLLMProvider({ 
+  apiKey: process.env.LLM_API_KEY 
+});
+
+const imageProvider = new YourImageProvider({ 
+  apiKey: process.env.IMAGE_API_KEY 
+});
+
+// ============================================
+// STEP 2: History Mapper
+// ============================================
+// Converts your app's message format to the LLM's expected format
+
+function mapHistoryToLLMFormat(history: Message[]) {
+  return history
+    .filter(msg => msg.role !== 'system')
+    .map(msg => ({
+      role: msg.role === 'assistant' ? 'model' : 'user',  // Adjust per provider
+      content: msg.content
+    }));
+}
+
+// ============================================
+// STEP 3: Agent L1 — The Narrative Strategist
+// ============================================
+// Fast model for reasoning and planning
+
+async function getNarrativePlan(
+  prompt: string, 
+  history: Message[], 
+  activeSlideIndex: number
+): Promise<string> {
+  
+  const formattedHistory = mapHistoryToLLMFormat(history);
+  
+  const systemPrompt = `You are a master of storytelling and design strategy.
+  
+CONTEXT: The user is currently viewing Slide index ${activeSlideIndex}.
+
+TASK: Analyze the user's request and determine the operation type:
+- EDIT: Modify the current slide's content, style, or layout
+- ADD: Create new slides (at end or at specific position)  
+- RESTRUCTURE: Reorder, delete, or fundamentally reorganize the deck
+
+Explain your plan clearly to the user. Be specific about:
+1. What you understood from their request
+2. Which slides will be affected
+3. What changes you will make`;
+
+  const response = await llmProvider.generateText({
+    model: 'fast-reasoning-model',  // e.g., gemini-2.5-flash, gpt-4o-mini
+    systemPrompt,
+    messages: [...formattedHistory, { role: 'user', content: prompt }]
+  });
+  
+  return response;
+}
+
+// ============================================
+// STEP 4: Agent L2 — The UI Architect
+// ============================================
+// Powerful model for code generation with STRUCTURED OUTPUT
+
+async function generateUIArchitect(
+  plan: string,
+  mode: AgentMode,
+  existingSlides: SlideContent[],
+  activeSlideIndex: number
+): Promise<UIArchitectOutput['slides']> {
+
+  // CRITICAL: Define the JSON schema for structured output
+  // This ensures the LLM returns valid, parseable data
+  const responseSchema = {
+    type: 'object',
+    properties: {
+      slides: {
+        type: 'array',
+        description: 'Array of slide objects to render',
+        items: {
+          type: 'object',
+          properties: {
+            id: { 
+              type: 'string',
+              description: 'Unique slide ID. Preserve existing ID if editing, generate new UUID if adding.'
+            },
+            title: { 
+              type: 'string',
+              description: 'Slide title for thumbnail/navigation'
+            },
+            code: { 
+              type: 'string', 
+              description: `Raw HTML with Tailwind CSS utility classes. 
+              
+CRITICAL RULES:
+- Use ONLY Tailwind utilities (no custom CSS)
+- Include {{IMG_0}}, {{IMG_1}}, etc. placeholders for images
+- Ensure aspect ratio matches mode (${mode === 'SLIDE' ? '16:9' : '9:16'})
+- Use semantic HTML (<section>, <article>, <figure>)
+- If editing existing slide, preserve structure but update content/style as per plan`
+            },
+            imagePrompts: {
+              type: 'array',
+              description: 'Image generation prompts for each placeholder',
+              items: {
+                type: 'object',
+                properties: {
+                  placeholder: { 
+                    type: 'string',
+                    description: 'The placeholder string used in code, e.g., "{{IMG_0}}"'
+                  },
+                  prompt: { 
+                    type: 'string',
+                    description: 'Detailed image generation prompt. Be specific about style, composition, lighting.'
+                  }
+                },
+                required: ['placeholder', 'prompt']
+              }
+            }
+          },
+          required: ['id', 'title', 'code', 'imagePrompts']
+        }
+      }
+    },
+    required: ['slides']
+  };
+
+  const systemPrompt = `You are a world-class UI Architect specializing in presentation design.
+
+CONTEXT:
+- Active slide index: ${activeSlideIndex}
+- Mode: ${mode} (${mode === 'SLIDE' ? '16:9 aspect ratio' : '9:16 portrait'})
+- Existing slides: ${existingSlides.length} total
+
+CRITICAL INSTRUCTIONS:
+1. If the plan involves EDITING slide at index ${activeSlideIndex}:
+   - Find the slide with matching index in the existing array
+   - PRESERVE its ID
+   - UPDATE the 'code' with new design/content
+   
+2. If ADDING new slides:
+   - Generate unique IDs (use UUID format)
+   - Maintain consistent visual style with existing slides
+   
+3. If DELETING slides:
+   - Simply OMIT them from the returned array
+
+4. For image placeholders:
+   - Use {{IMG_0}}, {{IMG_1}}, etc. in the HTML code
+   - Provide matching prompts in imagePrompts array
+
+OUTPUT: Return the COMPLETE slides array (including unchanged slides).`;
+
+  const response = await llmProvider.generateJSON<UIArchitectOutput>({
+    model: 'powerful-code-model',  // e.g., gemini-2.5-pro, gpt-4o, claude-3.5-sonnet
+    systemPrompt,
+    messages: [{
+      role: 'user',
+      content: `PLAN:\n${plan}\n\nEXISTING_SLIDES:\n${JSON.stringify(existingSlides, null, 2)}`
+    }],
+    responseSchema,
+    responseMimeType: 'application/json'
+  });
+
+  return response.slides;
+}
+
+// ============================================
+// STEP 5: Agent L3 — The Vision Specialist
+// ============================================
+// Image generation model
+
+async function generateVisualAsset(
+  visualDescription: string,
+  aspectRatio: '16:9' | '1:1' | '9:16' = '16:9'
+): Promise<string | undefined> {
+  try {
+    const response = await imageProvider.generateImage({
+      prompt: `${visualDescription}. High-end professional photography, 
+               cinematic lighting, 8K resolution, magazine quality.`,
+      aspectRatio,
+      style: 'photorealistic'
+    });
+    
+    // Return as Base64 data URI
+    if (response.base64) {
+      return `data:image/png;base64,${response.base64}`;
+    }
+    if (response.url) {
+      // If provider returns URL, fetch and convert to base64
+      return await fetchAndConvertToBase64(response.url);
+    }
+  } catch (err: any) {
+    console.warn('Image generation skipped:', err?.message);
+  }
+  return undefined;
+}
+
+// ============================================
+// STEP 6: Main Orchestrator Function
+// ============================================
+
+export async function generateSlides(
+  prompt: string,
+  mode: AgentMode,
+  existingSlides: SlideContent[] = [],
+  history: Message[] = [],
+  activeSlideIndex: number = 0
+): Promise<{ slides: SlideContent[]; explanation: string }> {
+
+  // PHASE 1: Get narrative plan from Strategist
+  const explanation = await getNarrativePlan(prompt, history, activeSlideIndex);
+
+  // PHASE 2: Get HTML/Tailwind code from UI Architect
+  const rawSlides = await generateUIArchitect(
+    explanation, 
+    mode, 
+    existingSlides, 
+    activeSlideIndex
+  );
+
+  // PHASE 3: Process each slide and generate images
+  const processedSlides: SlideContent[] = [];
+
+  for (const slide of rawSlides) {
+    // Check if slide needs image generation
+    const needsImages = slide.code.includes('{{IMG_');
+    const assets: Record<string, string> = {};
+
+    if (needsImages && slide.imagePrompts?.length > 0) {
+      // Generate images in parallel for speed
+      const imagePromises = slide.imagePrompts.map(async (imgReq) => {
+        const base64 = await generateVisualAsset(imgReq.prompt);
+        if (base64) {
+          return { placeholder: imgReq.placeholder, url: base64 };
+        }
+        return null;
+      });
+
+      const results = await Promise.all(imagePromises);
+      results.forEach(result => {
+        if (result) assets[result.placeholder] = result.url;
+      });
+    }
+
+    // PHASE 4: String replacement — swap placeholders with actual images
+    let finalCode = slide.code;
+    Object.entries(assets).forEach(([placeholder, url]) => {
+      finalCode = finalCode.replaceAll(placeholder, url);
+    });
+
+    processedSlides.push({
+      id: slide.id || crypto.randomUUID(),
+      title: slide.title,
+      code: finalCode,
+      imageAssets: assets
+    });
+  }
+
+  return { explanation, slides: processedSlides };
+}
+```
+
+### C. Example Generated Output
+
+The UI Architect produces HTML like this:
+
+```html
+<section class="relative w-full h-full bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-16">
+  <div class="absolute inset-0 overflow-hidden">
+    <img src="{{IMG_0}}" alt="Background" class="w-full h-full object-cover opacity-20" />
+  </div>
+  <div class="relative z-10 text-center max-w-4xl">
+    <h1 class="text-7xl font-bold text-white mb-6 tracking-tight">
+      Q4 Revenue Report
+    </h1>
+    <p class="text-2xl text-purple-200 font-light">
+      Exceeding Expectations Across All Verticals
+    </p>
+    <div class="mt-12 flex justify-center gap-8">
+      <div class="text-center">
+        <div class="text-5xl font-bold text-emerald-400">$4.2M</div>
+        <div class="text-gray-400 mt-2">Total Revenue</div>
+      </div>
+      <div class="text-center">
+        <div class="text-5xl font-bold text-blue-400">+127%</div>
+        <div class="text-gray-400 mt-2">YoY Growth</div>
+      </div>
+    </div>
+  </div>
+</section>
+```
+
+After image generation and placeholder replacement, `{{IMG_0}}` becomes:
+```
+data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...
+```
+
+### D. Wiring to API Route
+
+```typescript
+// app/api/generate/route.ts
+import { NextRequest, NextResponse } from 'next/server';
+import { generateSlides } from '@/lib/ai/services/slideGenerator';
+
+export async function POST(req: NextRequest) {
+  const { prompt, mode, existingSlides, activeSlideIndex, history } = await req.json();
+
+  try {
+    const result = await generateSlides(
+      prompt,
+      mode,
+      existingSlides,
+      history,
+      activeSlideIndex
+    );
+
+    return NextResponse.json(result);
+  } catch (error: any) {
+    return NextResponse.json(
+      { error: error.message },
+      { status: 500 }
+    );
+  }
+}
+```
+
+---
+
+## 10. Security: Handling "Dangerous" HTML
 
 Rendering AI-generated HTML is a security risk (XSS).
 
@@ -286,7 +681,7 @@ In Next.js, render the code inside a **sandboxed iframe**:
 
 ---
 
-## 10. Scaling for High Traffic (The "Million Slide" Strategy)
+## 11. Scaling for High Traffic (The "Million Slide" Strategy)
 
 If you have 20,000 users each generating 50 slides, you will reach **1,000,000 slides**.
 
@@ -312,7 +707,7 @@ CREATE INDEX idx_project_slides ON "Slide" ("projectId", "order");
 
 ---
 
-## 11. Next Steps for Implementation
+## 12. Next Steps for Implementation
 
 ### Priority 1: Core AI Integration
 
@@ -340,7 +735,7 @@ CREATE INDEX idx_project_slides ON "Slide" ("projectId", "order");
 
 ---
 
-## 12. Conclusion
+## 13. Conclusion
 
 The GLM Slide Agent is a journey from **Prompting** to **Orchestration**. By decoupling the Brain (Chat) from the Canvas (Slides), using a multi-agent pipeline, and planning for scale with hybrid storage and context windowing, you create a professional tool that grows with your user base.
 

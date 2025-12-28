@@ -260,14 +260,6 @@ export function SlidePreview({ currentSlide, currentSlideIndex, totalSlides, onN
                             </div>
                         )}
 
-                        <div className="w-[30%] bg-zinc-50 border-l border-zinc-100 p-12 flex flex-col items-center justify-center gap-6 text-center">
-                            <div className="h-16 w-16 bg-brand/10 rounded-full flex items-center justify-center mb-4">
-                                <Sparkles className="h-8 w-8 text-brand" />
-                            </div>
-                            <p className="text-[9px] font-bold tracking-widest text-zinc-400 uppercase leading-relaxed max-w-[150px]">
-                                AI suggestion: This layout prioritizes clarity for executive audiences.
-                            </p>
-                        </div>
                     </motion.div>
                 </AnimatePresence>
             </div>
